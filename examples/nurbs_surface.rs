@@ -40,7 +40,16 @@ fn main() {
         for j in 0..=10 {
             let u = i as f64 / 10.0;
             let v = j as f64 / 10.0;
-            let point = nurbs_surface_point(u, v, &control_points, &weights, &knots_u, &knots_v, degree_u, degree_v);
+            let point = nurbs_surface_point(
+                u,
+                v,
+                &control_points,
+                &weights,
+                &knots_u,
+                &knots_v,
+                degree_u,
+                degree_v,
+            );
             println!("Point at (u, v) = ({}, {}): {:?}", u, v, point);
         }
     }
