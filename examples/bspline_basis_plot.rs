@@ -2,7 +2,7 @@ use bsfun::bspline_basis;
 use plotters::{prelude::*, style::full_palette::ORANGE};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let colors = [RED, GREEN, BLUE, ORANGE];
+    let colors = [RED, GREEN, BLUE, ORANGE, CYAN, MAGENTA, BLACK];
 
     for degree in 0..4 {
         // Create a knot vector with degree + 1 repeated values at the start and end
@@ -18,13 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut chart = ChartBuilder::on(&root)
             .caption(
-                format!("Degree {}", degree + 1),
+                format!("B-Spline Basis Degree {}", degree + 1),
                 ("sans-serif", 20).into_font(),
             )
             .margin(5)
             .x_label_area_size(30)
             .y_label_area_size(30)
-            .build_cartesian_2d(0f64..(degree + 2) as f64, 0f64..1f64)?;
+            .build_cartesian_2d(0f64..(degree + 2) as f64, 0f64..1.05f64)?;
 
         chart.configure_mesh().draw()?;
 
