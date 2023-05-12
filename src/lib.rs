@@ -6,6 +6,7 @@
 ///     bspline_basis()
 ///     rational_bspline_basis()
 ///     nurbs_curve_point()
+pub mod nurbs;
 
 // Calculates the B-Spline Basis Function of `degree` at index `i`
 // over the non-uniform `knots`, evaluated at `t`.
@@ -39,7 +40,7 @@ pub fn bspline_basis(i: usize, degree: usize, knots: &[f64], t: f64) -> f64 {
 
 // Calculates the rational (weighted) B-Spline Basis Function of `degree`
 // at index `i` over the `knots`, evaluated at `t`.
-pub fn rational_bspline_basis(
+pub fn rational_bspline_basis_curve(
     i: usize,
     degree: usize,
     knots: &[f64],
@@ -54,6 +55,36 @@ pub fn rational_bspline_basis(
         0.0
     } else {
         numerator / denominator
+    }
+}
+
+// Calculates the rational B-Spline basis for surfaces over the parameters `u` and `v`
+// weights are accordingly also two-dimensional
+pub fn rational_bspline_basis_surface(
+    i: usize,
+    j: usize,
+    degree_u: usize,
+    degree_v: usize,
+    knots_u: &[f64],
+    knots_v: &[f64],
+    weights: &[Vec<f64>],
+    u: f64,
+    v: f64,
+) -> f64 {
+    let numerator_u = weights[i][j] * bspline_basis(i, degree_u, knots_u, u);
+    let numerator_v = weights[i][j] * bspline_basis(j, degree_v, knots_v, v);
+    let denominator: f64 = (0..weights.len())
+        .flat_map(|i| (0..weights[0].len()).map(move |j| (i, j)))
+        .map(|(i, j)| {
+            weights[i][j]
+                * bspline_basis(i, degree_u, knots_u, u)
+                * bspline_basis(j, degree_v, knots_v, v)
+        })
+        .sum();
+    if denominator.abs() < std::f64::EPSILON {
+        0.0
+    } else {
+        (numerator_u * numerator_v) / denominator
     }
 }
 
@@ -74,7 +105,7 @@ pub fn nurbs_curve_point<'a>(
     let mut point = vec![0.0; n_dims];
 
     for i in 0..control_points.len() {
-        let basis = rational_bspline_basis(i, degree, knots, weights, t);
+        let basis = rational_bspline_basis_curve(i, degree, knots, weights, t);
         for k in 0..n_dims {
             point[k] += basis * control_points[i][k];
         }
@@ -86,31 +117,30 @@ pub fn nurbs_curve_point<'a>(
 // Calculates a point on a NURBS surface
 // Same assumptions as for nurbs_curve_point()
 pub fn nurbs_surface_point<'a>(
-    u: f64,
-    v: f64,
-    control_points: &'a [Vec<Vec<f64>>],
-    weights: &'a [Vec<f64>],
-    knots_u: &'a [f64],
-    knots_v: &'a [f64],
+    control_points: &[Vec<Vec<f64>>],
+    weights: &[Vec<f64>],
+    knots_u: &[f64],
+    knots_v: &[f64],
     degree_u: usize,
     degree_v: usize,
+    u: f64,
+    v: f64,
 ) -> Vec<f64> {
-    let n_dims = control_points[0][0].len();
-    let mut point = vec![0.0; n_dims];
-
-    for i in 0..control_points.len() {
-        for j in 0..control_points[i].len() {
-            let basis_u = rational_bspline_basis(i, degree_u, knots_u, &weights[i], u);
-            let basis_v = rational_bspline_basis(j, degree_v, knots_v, &weights[j], v);
-            let basis = basis_u * basis_v;
-
-            for k in 0..n_dims {
-                point[k] += basis * control_points[i][j][k];
+    let n = control_points.len();
+    let m = control_points[0].len();
+    let d = control_points[0][0].len();
+    let mut result = vec![0.0; d];
+    for i in 0..n {
+        for j in 0..m {
+            let basis = rational_bspline_basis_surface(
+                i, j, degree_u, degree_v, knots_u, knots_v, weights, u, v,
+            );
+            for k in 0..d {
+                result[k] += basis * control_points[i][j][k];
             }
         }
     }
-
-    point
+    result
 }
 
 #[cfg(test)]
@@ -171,7 +201,7 @@ mod tests {
         for i in 0..knots.len() - 1 {
             for t in 0..=100 {
                 let t = t as f64 / 100.0;
-                let result = rational_bspline_basis(i, 0, &knots, &weights, t);
+                let result = rational_bspline_basis_curve(i, 0, &knots, &weights, t);
                 dbg!(i, t, result);
                 if t >= knots[i] && t < knots[i + 1] {
                     assert!(result > (1.0 - 0.000001) && result < (1.0 + 0.000001));
@@ -195,7 +225,7 @@ mod tests {
         for i in 0..knots.len() - 2 - 1 {
             for t in 0..=100 {
                 let t = t as f64 / 100.0;
-                let result = rational_bspline_basis(i, 1, &knots, &weights, t);
+                let result = rational_bspline_basis_curve(i, 1, &knots, &weights, t);
                 dbg!(i, t, result);
                 let mut total = 0.0;
                 for j in 0..weights.len() {

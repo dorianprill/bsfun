@@ -2,18 +2,21 @@
 
 ## Basis Spline Fun(ctions)
 
-This is a super simple Rust library for working with basis splines and [NURBS (Non-Uniform Rational B-Splines)](https://en.wikipedia.org/wiki/Non-uniform_rational_B-spline) with zero dependecies (besides `alloc::Vec`).
+This is a super simple Rust library for working with basis splines and [NURBS (Non-Uniform Rational B-Splines)](https://en.wikipedia.org/wiki/Non-uniform_rational_B-spline) in arbitrary dimension with zero dependecies (besides `alloc::Vec`).
 
-It consists of only four functions:
+These five basic functions are used in `NURBSCurve` and `NURBSSurface` evaluation:
 
-1. `bspline_basis()` Calculate the value of a basis spline at a given `t`
-2. `rational_bspline_basis()` Calculate the value of a rational basis spline at a given `t`
-3. `nurbs_curve_point()` Calculate the value of a NURBS curve at a given value `t`
-4. `nurbs_surface_point()` Calculate the value of a NURBS surface at a given value pair `(u, v)`
+1. `bspline_basis()` Calculate the value of a basis spline at a given `t`. This is the basic building block for all splines and the rational basis functions.
+2. `rational_bspline_basis_curve()` Calculate the value of a rational basis spline for curves at a given `t`
+3. `rational_bspline_basis_surface()` Calculate the value of a rational basis spline for surfaces at a given value pair `(u, v)`
+4. `nurbs_curve_point()` Calculate the value of a NURBS curve at a given value `t`
+5. `nurbs_surface_point()` Calculate the value of a NURBS surface at a given value pair `(u, v)`
 
-You could use `1` and `2` to build your own Splines. `3` and `4` are just functions for calculating the value of a NURBS curve or surface for a set of parameters.
+You could use `1`, `2` and `3` to build your own Splines. `4` and `5` are just functions for calculating the value of a NURBS curve or surface for a set of parameters directly.
 
-Since this library does not provide any structs or traits you have take care of the proper shapes of knots, weights and control points for any given degree yourself. You may find a more practical NURBS implementation in the libraries `truck` and `capstan`.
+> Caution: `4` and `5` are mostly for playing around and will not validate parameters for you. You have to make sure that the parameters are in the correct range and of correct shape yourself. If you don't want that use the structs `NURBSCurve` and `NURBSSurface` and their `eval()` methods
+
+Since this library does not have enhanced functionality beyond curve evaluations, you may want to use a more practical NURBS implementation from e.g. the library `truck`.
 
 ## Visualization of B-Spline Basis Functions up to Degree 4
 

@@ -11,6 +11,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .chain((1..=degree).map(|i| i as f64))
             .chain(vec![degree as f64 + 1.0; degree + 1])
             .collect::<Vec<_>>();
+        // TODO check if this version makes more sense for degree 1
+        // let num_internal_knots = degree + 1;
+        // let knots = vec![0.0; degree+1]
+        // .into_iter()
+        // .chain((1..=num_internal_knots).map(|i| i as f64))
+        // .chain(vec![degree as f64 + 1.0; degree+1])
+        // .collect::<Vec<_>>();
 
         let filename = format!("basis_degree_{}.png", degree + 1);
         let root = BitMapBackend::new(&filename, (400, 300)).into_drawing_area();
