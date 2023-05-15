@@ -27,7 +27,7 @@ Number of knots: n + 1 + k (must be non-decreasing in value)
 $$
 Knots \quad t_{i} < t_{i+1} \quad \text{for } i = 0, \dots, n + k
 $$
-Recursion formula for B-Spline basis functions:
+Recursion formula for B-Spline basis functions:  
 $$
 \begin{align*}
 B_{i, 0}(x) = \begin{cases}
