@@ -36,6 +36,11 @@ impl NURBSCurve {
                 return Err("Weights must be non-negative");
             }
         }
+        // the implementation uses Vec<Vec<>> so points could potentially be of different dimension
+        if !control_points.iter().all(|ref v| v.len() == control_points[0].len()) {
+            return Err("All control points must be of the same dimension");
+        }
+
         // Everything checks out, so construct the NURBSCurve
         Ok(NURBSCurve {
             degree,
