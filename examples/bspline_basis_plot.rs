@@ -19,13 +19,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .chain(vec![degree as f64 + 1.0; degree+1])
         // .collect::<Vec<_>>();
 
-        let filename = format!("basis_degree_{}.png", degree + 1);
+        let filename = format!("basis_degree_{}.png", degree);
         let root = BitMapBackend::new(&filename, (400, 300)).into_drawing_area();
         root.fill(&WHITE)?;
 
         let mut chart = ChartBuilder::on(&root)
             .caption(
-                format!("B-Spline Basis Degree {}", degree + 1),
+                format!("B-Spline Basis Degree {}", degree),
                 ("sans-serif", 20).into_font(),
             )
             .margin(5)
