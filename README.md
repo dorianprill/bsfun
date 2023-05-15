@@ -19,7 +19,8 @@ You could use `1`, `2` and `3` to build your own Splines. `4` and `5` are just f
 Since this library does not have enhanced functionality beyond curve evaluations, you may want to use a more practical NURBS implementation from e.g. the library `truck`.
 
 ## Visualization of B-Spline Basis Functions
-Degree: k    
+
+Degree: k  
 Number of control points: n + 1  
 Number of knots: n + 1 + k (must be non-decreasing in value)
 
