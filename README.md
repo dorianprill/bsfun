@@ -32,7 +32,7 @@ Recursion formula for B-Spline basis functions:
 
 $$
 \begin{align*}
-B_{i, 0}(x) = \begin{cases}
+B_{i, 1}(x) = \begin{cases}
 1 & \text{if } t_i \leq x < t_{i+1} \\
 0 & \text{otherwise}
 \end{cases}
