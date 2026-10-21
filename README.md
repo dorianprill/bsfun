@@ -37,6 +37,18 @@ assert!((midpoint[1] - FRAC_1_SQRT_2).abs() < 1e-14);
 assert_eq!(curve.eval(1.0).unwrap(), vec![0.0, 1.0]);
 ```
 
+![Exact NURBS quarter-circle with control points, control polygon, and curve parameters](nurbs_quarter_circle.svg)
+
+The middle control point `(1, 1)` has weight `1/√2`. These weights give the curve
+`x² + y² = 1` between `(1, 0)` and `(0, 1)`. The dashed lines join the control
+points; the curve does not pass through the middle control point.
+
+Regenerate the plot with Kuva from the repository root:
+
+```sh
+cargo run --example nurbs_quarter_circle_plot
+```
+
 There are two evaluation paths within the existing API: the free functions
 build on recursive `bspline_basis()` for a direct expression of the mathematics;
 the structs' `.eval()` methods use a private iterative implementation that avoids
@@ -46,42 +58,6 @@ same points up to floating-point rounding.
 For surfaces, index `i` follows `u` and index `j` follows `v` in both
 `control_points[i][j]` and `weights[i][j]`. Both grids must be rectangular. Points can have any
 positive dimension; a surface point need not be three-dimensional.
-
-## Input and numerical conventions
-
-For **n control points** and **degree p**, there are **n + p + 1 knots**. The
-knots are finite and non-decreasing, `p < n`, and no knot occurs more than
-`p + 1` times. Degree zero is supported. The evaluation domain is the closed
-interval **[knots[p], knots[n]]**, which must have positive length. Surfaces use
-the same rules in each direction.
-
-Interior knots use the right-hand value. The domain's right endpoint uses the
-left-hand limit. Thus clamped splines with positive endpoint weights interpolate
-their first and last control points, including at the right endpoint. Unclamped
-splines use the same domain rule without assuming endpoint interpolation.
-
-Constructors return `Err` for empty or inconsistent data, non-finite coordinates
-or knots, invalid degrees or knot vectors, and negative or non-finite weights.
-At least one weight must be positive. Individual zero weights are allowed;
-`eval()` returns `Err` where the computed rational denominator is zero. It also
-rejects non-finite parameters and parameters outside the evaluation domain.
-
-The free functions assume the same valid input data and may panic on malformed
-shapes or indices. Raw bases retain their full knot support, including outside
-the structs' standard evaluation domain. The free point functions likewise leave
-parameter range validation to the caller. They return zero outside knot support
-(including non-finite parameters) or where the rational denominator is zero.
-Use the structs for domain validation and errors on undefined evaluations.
-
-The free basis and point functions use the recursive Cox–de Boor definition for
-teaching. Struct `.eval()` methods use a private bottom-up helper to avoid
-repeated recursive work. Both paths compute each point's rational
-denominator once and scales weighted contributions and coordinates
-to reduce overflow and underflow. Compensated sums retain small terms amid large
-opposite coordinate contributions. There is no absolute epsilon threshold for
-small weights or knot spans. Ordinary `f64` precision still limits very disparate
-scales, cancellation, and tiny tensor-product bases; this is a teaching tool,
-not an arbitrary-precision geometry kernel.
 
 ## Visualization of B-spline basis functions
 
@@ -101,8 +77,8 @@ B_{i,p}(t) = \frac{t-t_i}{t_{i+p}-t_i}B_{i,p-1}(t)
           + \frac{t_{i+p+1}-t}{t_{i+p+1}-t_{i+1}}B_{i+1,p-1}(t).
 $$
 
-A term with a zero denominator contributes zero. The domain and endpoint
-conventions above apply to the final bases.
+A term with a zero denominator contributes zero. The input conventions below
+define the evaluation domain and its endpoint behavior.
 
 The grid below uses the same interior knots `[1, 2, 3]` and domain `[0, 4]` for
 every degree, with `p + 1` repeated knots at each end. Generated with
@@ -115,6 +91,38 @@ Regenerate it from the repository root:
 ```sh
 cargo run --example bspline_basis_plot
 ```
+
+## Input and numerical conventions
+
+A degree `p` spline with `n` control points needs `n + p + 1` knots, with
+`0 <= p < n`. Knots must be finite and non-decreasing. A knot can occur at most
+`p + 1` times. The structs evaluate on `[knots[p], knots[n]]`, and the interval
+must have positive length. These rules apply to each direction of a surface.
+
+At an interior knot, evaluation uses the right-hand value. At the domain's right
+endpoint, it uses the left-hand limit. A clamped spline interpolates its first
+and last control points if their weights are positive. An unclamped spline need
+not pass through either endpoint control point.
+
+Constructors reject empty or inconsistent data, non-finite coordinates, invalid
+knot vectors, and negative or non-finite weights. At least one weight must be
+positive. `eval()` rejects non-finite or out-of-domain parameters and returns
+`Err` when the computed rational denominator is zero. Zero weights are allowed,
+but can leave parts of the domain undefined.
+
+The free functions assume valid data and may panic on malformed shapes or
+indices. They evaluate over the full knot support, including outside the
+structs' domains. They return zero for non-finite parameters, outside knot
+support, or when the rational denominator is zero. Use the structs for input
+and domain validation.
+
+The free functions use recursive Cox-de Boor evaluation. Struct `.eval()` methods
+compute the bases iteratively. Both paths compute the rational denominator once
+per point. They scale weighted contributions and coordinates to reduce overflow
+and underflow, and use compensated sums to retain small terms during
+cancellation. Neither path uses an absolute epsilon cutoff for small weights or
+knot spans. Extreme scales, cancellation, and tiny products of surface bases
+can still lose precision in `f64`.
 
 ## Development
 
