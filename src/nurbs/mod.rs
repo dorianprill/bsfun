@@ -1,4 +1,4 @@
-// nurbs/mod.rs
+//! Validated owning NURBS curves and tensor-product surfaces.
 pub mod nurbs_curve;
 pub mod nurbs_surface;
 

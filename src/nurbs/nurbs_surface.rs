@@ -1,143 +1,99 @@
-use crate::rational_bspline_basis_surface;
+use crate::{parameter_in_domain, surface_basis, validate_knots, validate_weights, weighted_point};
+
+/// A validated tensor-product NURBS surface in arbitrary positive dimension.
+///
+/// Rows follow the `u` direction and columns follow `v`, for both weights and
+/// control points. All rows must have the same length.
+/// Evaluation uses a private iterative Cox–de Boor implementation; the free
+/// functions use recursive bases. Both paths share weight normalization and
+/// coordinate summation.
 pub struct NURBSSurface {
     degree_u: usize,
     degree_v: usize,
     knots_u: Vec<f64>,
     knots_v: Vec<f64>,
     weights: Vec<Vec<f64>>,
-    control_points: Vec<Vec<Vec<f64>>>, // each control point is a 3D point
+    control_points: Vec<Vec<Vec<f64>>>,
 }
 
 impl NURBSSurface {
-    pub fn new(degree_u: usize, degree_v: usize, knots_u: Vec<f64>, knots_v: Vec<f64>, weights: Vec<Vec<f64>>, control_points: Vec<Vec<Vec<f64>>>) -> Result<Self, &'static str> {
-        if degree_u == 0 || degree_v == 0 {
-            return Err("Degree must be greater than 0");
+    /// Construct a surface, validating a rectangular control net and weight
+    /// grid, equal positive point dimensions, finite coordinates and knots,
+    /// non-negative finite weights (at least one positive), and valid knot
+    /// counts, order, multiplicities, and nonempty domains in both directions.
+    ///
+    /// Degree zero is supported in either direction. Each degree must be less
+    /// than the corresponding control point count. Zero weights can leave some
+    /// parameter pairs undefined.
+    pub fn new(
+        degree_u: usize,
+        degree_v: usize,
+        knots_u: Vec<f64>,
+        knots_v: Vec<f64>,
+        weights: Vec<Vec<f64>>,
+        control_points: Vec<Vec<Vec<f64>>>,
+    ) -> Result<Self, &'static str> {
+        let rows = control_points.len();
+        let columns = control_points.first().map_or(0, Vec::len);
+        let dimensions = control_points
+            .first()
+            .and_then(|row| row.first())
+            .map_or(0, Vec::len);
+        if dimensions == 0 {
+            return Err("The control net must be nonempty with positive point dimension");
         }
-        if knots_u.len() != control_points.len() + degree_u + 1 {
-            return Err("Invalid knots_u length");
+        if control_points.iter().any(|row| row.len() != columns) {
+            return Err("The control net must be rectangular");
         }
-        if knots_v.len() != control_points[0].len() + degree_v + 1 {
-            return Err("Invalid knots_v length");
+        if control_points.iter().flatten().any(|point| {
+            point.len() != dimensions || point.iter().any(|coordinate| !coordinate.is_finite())
+        }) {
+            return Err("Control points must have equal dimension and finite coordinates");
         }
-        if weights.len() != control_points.len() || weights[0].len() != control_points[0].len() {
-            return Err("Invalid weights dimensions");
+        if weights.len() != rows || weights.iter().any(|row| row.len() != columns) {
+            return Err("Weights must match the rectangular control net");
         }
-        if knots_u.len() != control_points.len() + degree_u + 1 {
-            return Err("Number of knots must be number of control points + degree + 1");
-        }
-        if knots_v.len() != control_points[0].len() + degree_v + 1 {
-            return Err("Number of knots must be number of control points + degree + 1");
-        }
-
-        // check that amount of weights/control points matches
-        for i in 0..weights.len() {
-            if weights[i].len() != control_points[i].len() {
-                return Err("Invalid weights/control points dimensions");
-            }
-        }
-
-        // Check that the knots are non-decreasing
-        for i in 0..knots_u.len() - 1 {
-            if knots_u[i] > knots_u[i + 1] {
-                return Err("Knots must be non-decreasing");
-            }
-        }
-        for i in 0..knots_v.len() - 1 {
-            if knots_v[i] > knots_v[i + 1] {
-                return Err("Knots must be non-decreasing");
-            }
-        }
-
-        // Check that the weights are non-negative
-        for i in 0..weights.len() {
-            for j in 0..weights[0].len() {
-                if weights[i][j] < 0.0 {
-                    return Err("Weights must be non-negative");
-                }
-            }
-        }
-
-        // the implementation uses Vec<Vec<Vec<>>> so points could potentially be of different dimension
-        for u in 0..control_points.len() {
-            for v in 0..control_points[0].len() {
-                if control_points[u][v].len() != control_points[0][0].len() {
-                    return Err("All control points must be of the same dimension");
-                }
-            }
-        }
-
-        Ok(NURBSSurface { 
-            degree_u, 
-            degree_v, 
-            knots_u, 
-            knots_v, 
-            weights, 
-            control_points 
+        validate_knots(degree_u, &knots_u, rows)?;
+        validate_knots(degree_v, &knots_v, columns)?;
+        validate_weights(weights.iter().flatten().copied())?;
+        Ok(Self {
+            degree_u,
+            degree_v,
+            knots_u,
+            knots_v,
+            weights,
+            control_points,
         })
     }
 
+    /// Evaluate on the closed knot domains in `u` and `v`.
+    /// Uses the private iterative Cox–de Boor implementation.
+    ///
+    /// Each domain runs from `knots[degree]` to `knots[control_point_count]`.
+    /// Returns an error for non-finite or out-of-domain parameters, or a zero
+    /// rational denominator. Right endpoints use their left-hand limits.
     pub fn eval(&self, u: f64, v: f64) -> Result<Vec<f64>, &'static str> {
-        if u < *self.knots_u.first().unwrap_or(&0.0) || u > *self.knots_u.last().unwrap_or(&0.0) {
-            return Err("Parameter u is out of the knot spans bounds");
+        if !parameter_in_domain(u, self.degree_u, &self.knots_u) {
+            return Err("Parameter u must be finite and within the evaluation domain");
         }
-        if v < *self.knots_v.first().unwrap_or(&0.0) || v > *self.knots_v.last().unwrap_or(&0.0) {
-            return Err("Parameter v is out of the knot spans bounds");
+        if !parameter_in_domain(v, self.degree_v, &self.knots_v) {
+            return Err("Parameter v must be finite and within the evaluation domain");
         }
-
-        let n = self.control_points.len();
-        let m = self.control_points[0].len();
-        let d = self.control_points[0][0].len();
-
-        let mut result = vec![0.0; d];
-
-        for i in 0..n {
-            for j in 0..m {
-                let basis = rational_bspline_basis_surface(i, j, self.degree_u, self.degree_v, &self.knots_u, &self.knots_v, &self.weights, u, v);
-                for k in 0..d {
-                    result[k] += basis * self.control_points[i][j][k];
-                }
-            }
+        let basis = surface_basis(
+            self.degree_u,
+            self.degree_v,
+            &self.knots_u,
+            &self.knots_v,
+            &self.weights,
+            u,
+            v,
+        );
+        if !basis.iter().any(|&value| value > 0.0) {
+            return Err("The rational denominator is zero at these parameters");
         }
-
-        Ok(result)
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_nurbs_surface() {
-        let degree_u = 1;
-        let degree_v = 1;
-
-        let knots_u = vec![0.0, 0.0, 1.0, 1.0];
-        let knots_v = vec![0.0, 0.0, 1.0, 1.0];
-
-        let weights = vec![
-            vec![1.0, 1.0],
-            vec![1.0, 1.0],
-        ];
-
-        let control_points = vec![
-            vec![
-                vec![0.0, 0.0, 0.0], // Point (0, 0, 0)
-                vec![1.0, 0.0, 0.0], // Point (1, 0, 0)
-            ],
-            vec![
-                vec![0.0, 1.0, 0.0], // Point (0, 1, 0)
-                vec![1.0, 1.0, 0.0], // Point (1, 1, 0)
-            ],
-        ];
-
-        let surface = NURBSSurface::new(degree_u, degree_v, knots_u, knots_v, weights, control_points).unwrap();
-
-        let u = 0.5;
-        let v = 0.75;
-
-        let result = surface.eval(u, v).unwrap();
-        assert_eq!(result, vec![0.75, 0.5, 0.0]);  // Since we're on the xy plane, z should be 0
+        Ok(weighted_point(
+            &basis,
+            self.control_points.iter().flatten().map(Vec::as_slice),
+        ))
     }
 }

@@ -2,11 +2,16 @@
 name = "bsfun"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Minimal, dependency-free B-spline bases and NURBS curve and surface evaluation"
+license = "MIT"
+repository = "https://github.com/dorianprill/bsfun"
+readme = "README.md"
+keywords = ["bspline", "nurbs", "splines", "geometry"]
+categories = ["mathematics", "science"]
+exclude = [".vscode/", ".gitignore"]
 
 [dependencies]
 
 [dev-dependencies]
-# plotters is only used for the example plots
-plotters = "0.3.4"
+# Kuva is only used to generate the example figure.
+kuva = { version = "0.6", default-features = false }
